@@ -5,4 +5,4 @@ This is the two-players version [Sevens](https://en.wikipedia.org/wiki/Sevens_(c
 In order to make it playable to two players, some special rules are applied to the game:
 
 ## Demo
-<img src="image/1.JPG" />
+<img src="demo/1.JPG" width=550 height=400/>
