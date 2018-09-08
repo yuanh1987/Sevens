@@ -1,0 +1,620 @@
+const PATTERN = ["spade", "heart", "club", "diamond", "jokerRed", "jokerBlack"];
+const PATCODE = ["\u2660", "\u2665", "\u2663", "\u2666", "\u2620", "\u2620"];
+const STATE = ["", "no card", "joker red", "joker black", "joker wild", "wild card", "already on board"];
+
+class Card extends React.Component{
+  render(){
+    let card = this.props.value;
+    let pat = "card " + card.pattern;
+    let content = card.content;
+    
+    if(card.status === "hide"){ pat += " cardBack"; content ="";}
+    else if(card.status === "leave"){ pat += " cardSlot"; content ="";}
+    else if(card.status === "trans"){ pat += " cardTrans";}
+    else if(card.status === "high"){ pat += " cardHigh";}
+    else if(card.status === "discard"){ pat += " cardBack";}
+    
+    if(card.owner === "player1" || card.owner == "player2")pat += " playerCard";
+    else if(card.owner === "wild")pat += " wildCard";
+    else if(card.owner === "board")pat += " boardCard";
+    else if(card.owner === "discard")pat += " discardCard";
+    
+    return(
+      <button className={pat} onClick={() => this.props.onClick(card)}> 
+        {content}
+      </button>
+    )
+  }
+}
+
+class Player extends React.Component{
+  render(){
+    let hand = this.props.value;
+    let array = hand.map((card, index) => {
+      return(<Card key={index} value={card} onClick={(i) => this.props.onClick(i)}/>)
+    });
+    return (
+      <div className="player"> {array} </div>
+    )
+  }
+}
+
+class Board extends React.Component{
+  renderboard(list){
+    let t = JSON.parse(JSON.stringify(list));
+    let array = t.reverse().map((card, index) => {
+      return(<Card key={index} value={card} onClick={(i) => this.props.onClick(i)}/>)});
+    return array;
+  }
+  
+  render(){
+    let board = this.props.value;
+    return(
+      <div>
+        <div className="boardline">{this.renderboard(board[0])}</div>
+        <div className="boardline">{this.renderboard(board[1])}</div>
+        <div className="boardline">{this.renderboard(board[2])}</div>
+        <div className="boardline">{this.renderboard(board[3])}</div>
+      </div>
+    )
+  }
+}
+
+class Discard extends React.Component{ 
+  render(){
+    let discard = this.props.value;
+    let card = {pattern: "", content: discard.length, owner: "discard"};
+    if(discard.length == 0) card.status = "trans";
+    else card.status = "discard";
+    return(
+      <div>
+        <Card value={card} onClick={(i) => this.props.onClick(i)}/>
+      </div>
+    )
+  }
+}
+
+class Menu extends React.Component{
+  render(){
+    const discript = [
+      "Turn",
+      "No card to play. Please discard one card.",
+      "Red Joker. You can treat it as any red card.",
+      "Black Joker. You can treat it as any black card.",
+      "You have the card your opponent use joker treat as. Please draw one wild card.",
+      "Please reveal one wild card.",
+      "Already on board. Please reveal another wild card.",
+      ""
+    ];
+    let status = this.props.value; //console.log(status);
+    let turn = status[0];
+    
+    let i;
+    if(status[1] == STATE[0]) i = 0;
+    else if(status[1] == STATE[1]) i = 1;
+    else if(status[1] == STATE[2]) i = 2;
+    else if(status[1] == STATE[3]) i = 3;
+    else if(status[1] == STATE[4]) i = 4;
+    else if(status[1] == STATE[5]) i = 5;
+    else if(status[1] == STATE[6]) i = 6;
+    else i = 7;
+    discript[7] = status[1];
+    
+    let content1 = (turn == "player1") ? discript[i] : "";
+    let content2 = (turn == "player2") ? discript[i] : "";
+    let p1box = (turn == "player1") ? "menubox menuboxhigh" : "menubox";
+    let p2box = (turn == "player2") ? "menubox menuboxhigh" : "menubox";
+    return(
+      <div className="menulayout">
+        <div className={p1box}> <p>player 1</p> <p>{content1}</p> </div>
+        <button className="menubtn" onClick={() => this.props.restart()}>restart</button>
+        <button className="menubtn" onClick={() => this.props.undo()}>undo</button>
+        <button className="menubtn" onClick={() => this.props.redo()}>redo</button>
+        <div className={p2box}> <p>player 2</p> <p>{content2}</p> </div>
+      </div>
+    )
+  }
+}
+
+class Game extends React.Component{
+  constructor(props){
+     super(props);  
+     let now = this.shuffle();
+     this.state = {
+        history: [{
+          player1: now.player1,
+          player2: now.player2,
+          discard1: now.discard1,
+          discard2: now.discard2,
+          wild: now.wild,
+          wildshow: now.wildshow,
+          board: now.board,
+          boardhigh : now.boardhigh,
+          whitelist: now.whitelist,
+          status: now.status,
+        }],
+        step: 0,
+     }
+  }
+  
+  numToCard(num){
+    let number = num;
+    let joker = num > 51 ? true : false;    
+    let pattern = joker ? PATTERN[num-52+4] : PATTERN[Math.floor(num/13)];
+    let JQK = ['J','Q','K'];
+    let text = (num%13+1) > 10 ? JQK[(num%13)%10] : (num%13+1);
+    let content = (joker ? "" : text ) + PATCODE[Math.floor(num/13)];  
+    return {number: number, joker: joker, pattern: pattern, content: content, status: "show"};
+  }
+  
+  shuffle(){   
+    // generate a list from 0 to 53 with random order 
+    let acc = 0;
+    let nums = Array(54).fill(0).map((el, index) => acc++).sort((a, b) => {return 0.5 - Math.random()});
+    
+    //distribute cards to players and wild area
+    let comp = (a, b) => {return a.number - b.number}; 
+    let player1 = nums.slice(0, 18).map((num, i) => {
+      let card = this.numToCard(num);
+      card.owner = "player1";
+      card.status = "hide";
+      return card;
+    }).sort(comp);
+    let player2 = nums.slice(18, 36).map((num, i) => {
+      let card = this.numToCard(num);
+      card.owner = "player2";
+      return card;
+    }).sort(comp);
+    let wild= nums.slice(36, 54).map((num, i) => {
+      let card = this.numToCard(num);
+      card.owner = "wild";
+      card.status = "hide";
+      return card;
+    })
+    
+    // initiate the board
+    let board = [];
+    acc = 0;
+    for(let i=0; i<4; i++){
+      let temp = Array(13).fill(0).map((el, index) => acc++);
+      board.push(temp.map((n,i) => { 
+        let c = this.numToCard(n);
+        c.owner = "board";
+        c.status = "trans";
+        return c;
+      }));
+    }
+    
+    let whitelist = [6,19,32,45,52,53];
+    let start = (0.5 - Math.random() > 0) ? "player1" : "player2";
+    let hand = (start == "player1") ? player1 : player2;   
+    let state = STATE[0];
+    let count = whitelist.reduce((acc,num) => { 
+      if(hand.find((c) => {return c.number === num})) return ++acc;
+      return acc;
+    }, 0);
+    if(count == 0) state = STATE[1];
+
+    return {player1: player1, player2: player2, discard1: [], discard2:[],
+            wild: wild, board: board, wildshow: [], boardhigh: [-1,-1],
+            whitelist: whitelist, status: [start, state]};
+  }
+  
+  restart(){
+    let now = this.shuffle();
+    this.setState({history: [{
+          player1: now.player1,
+          player2: now.player2,
+          discard1: now.discard1,
+          discard2: now.discard2,
+          wild: now.wild,
+          wildshow: now.wildshow,
+          board: now.board,
+          boardhigh : now.boardhigh,
+          whitelist: now.whitelist,
+          status: now.status
+        }],
+        step: 0,});
+     this.gameCenter(now);
+  }
+  
+  undo(){
+    //if(this.state.step > 0) this.setState({step: --this.state.step});
+    const history = this.state.history;
+    let step = this.state.step;
+    do{
+      step--;
+    }while(history[step].status[0] == "player1" && step > 0);
+    this.setState({step: step});
+  }
+  redo(){
+    //if(this.state.step < this.state.history.length-1) this.setState({step: ++this.state.step});
+    const history = this.state.history;
+    let step = this.state.step;
+    do{
+      step++;
+    }while(history[step].status[0] == "player1" && step < history.length);
+    this.setState({step: step});
+  }
+  
+  addCardToOwner(current, card){
+    let hand = (current.status[0] === "player1") ? current.player1 : current.player2;
+    let cardcpy = JSON.parse(JSON.stringify(card));
+    cardcpy.owner = current.status[0]; 
+    if(cardcpy.owner == "player1") cardcpy.status = "show";
+    else cardcpy.status = "hide";
+    hand.push(cardcpy);
+    hand.sort((a, b) => {return a.number - b.number}); //console.log(hand);
+    
+    if(current.status[0] === "player1") current.player1 = hand;
+    else current.player2 = hand;
+    
+    let pos = current.wild.findIndex((c) => {return c.number === card.number});
+    current.wild[pos].status = "leave";
+  }
+  
+  removeCardFromHand(current, card){
+    let hand;
+    if(card.owner === "board"){
+      let turn = current.status[0];
+      hand = turn === "player1" ? current.player2 : current.player1;
+    }
+    else hand = card.owner === "player1" ? current.player1 : current.player2;
+    let pos = hand.findIndex((c) => {return c.number === card.number});
+    if(pos > -1){ hand.splice(pos,1); return true;}
+    else return false;
+  }
+  
+  showCardOnBoard(current, card){
+    let board = current.board;
+    let whitelist = current.whitelist;
+    
+    //show card on the board
+    let col = Math.floor(card.number/13);
+    let pos = board[col].findIndex((c) => {return c.number === card.number});
+    if(current.boardhigh[0] != -1)
+      board[current.boardhigh[0]][current.boardhigh[1]].status = "show";
+    board[col][pos].status = "high";
+    current.boardhigh[0] = col;
+    current.boardhigh[1] = pos;
+    
+    //remove card number from whitelist
+    let pos2 = whitelist.indexOf(card.number);
+    let checkonboard = 
+    whitelist.splice(pos2,1);
+    if(!card.joker){
+      if(card.number%13 <= 6 && card.number%13 !== 0)  whitelist.push(card.number-1);
+      if(card.number%13 >= 6 && card.number%13 !== 12) whitelist.push(card.number+1);
+    }   
+  }
+  
+  handClick(card){
+    const step = this.state.step;
+    const history = this.state.history.slice();  
+    let next = JSON.parse(JSON.stringify(history[step]));    
+    let whitelist = next.whitelist;
+    let turn = next.status[0];
+    let state = next.status[1];
+    
+    // if in wrong state, return
+    if(state !== STATE[0] && state !== STATE[1]) return;
+    // if not his card, return
+    if(card.owner !== turn) return;   
+    // if not in whitelist, return
+    if(whitelist.indexOf(card.number) < 0 && state !== STATE[1]) return;
+    
+    
+    // if no card, discard one card and reveal one wild card
+    if(state === STATE[1]){
+      let discard = (turn === "player1") ? next.discard1 : next.discard2;
+      discard.push(card);
+      this.removeCardFromHand(next, card);
+      next.status[1] = STATE[5];
+    }
+    // the selected card is in the whitelist
+    else{ 
+      if(card.joker){
+        this.removeCardFromHand(next, card);
+        next.status[1] = (card.number === 52) ? STATE[2] : STATE[3];
+      }
+      else{
+        this.showCardOnBoard(next, card);
+        this.removeCardFromHand(next, card);
+        next.status[0] = (turn === "player1") ? "player2" : "player1";
+        next.status[1] = STATE[0];        
+      }
+    }
+    
+    // submit next object to gameCenter
+    this.gameCenter(next);
+  }
+  
+  wildClick(card){
+    const step = this.state.step;
+    const history = this.state.history.slice();  
+    let next = JSON.parse(JSON.stringify(history[step]));
+    let status = next.status;
+    let wild = next.wild;
+    let pos = wild.findIndex((c) => {return c.number === card.number});
+    
+    // if in wrong state, return
+    if(status[1] !== STATE[4] && status[1] !== STATE[5] && status[1] !== STATE[6]) return;
+    // if already revealed, return
+    if(wild[pos].status != "hide") return;
+    
+    // already on the board(because jokers), choose another wild card 
+    let col = Math.floor(card.number/13);
+    let onboard = (card.joker) ? -1 : next.board[col].findIndex((c) => {
+       if(c.number == card.number && c.status == "show") return 1;
+       else return 0;
+    })
+    if(onboard > -1){ 
+      console.log("already on board");
+      next.wild[pos].status = "leave";
+      next.status[1] = STATE[6];
+      this.gameCenter(next);
+      return;
+    }
+    
+    // opponent choose one wild card adding to his hand
+    if(status[1] === STATE[4]){
+      this.addCardToOwner(next, card);
+      next.status[1] = STATE[0];
+    }
+    // after discard one card, reveal one wild card
+    else if(status[1] === STATE[5] || status[1] === STATE[6]){
+      let whitelist = next.whitelist;
+      if(whitelist.indexOf(card.number) > -1){//if in whitelist, move that card to board
+        if(card.joker){
+          console.log("joker..");
+          next.wild[pos].status = "leave";
+          next.status[1] = (card.number == 52) ? STATE[2] : STATE[3];
+        }
+        else{
+          this.showCardOnBoard(next, card);
+          next.wild[pos].status = "leave";
+          next.status[0] = (status[0] === "player1") ? "player2" : "player1";
+          next.status[1] = STATE[0];
+        }
+      }
+      else{//if not in whitelist, leave it showing in wild area
+          next.wildshow.push(card.number);
+          next.wild[pos].status = "show";
+          next.status[0] = (status[0] === "player1") ? "player2" : "player1";
+          next.status[1] = STATE[0];      
+      }
+    }
+    
+    // submit next object to gameCenter
+    this.gameCenter(next);
+  }
+  
+  boardClick(card){
+    const step = this.state.step;
+    const history = this.state.history.slice();  
+    let next = JSON.parse(JSON.stringify(history[step]));
+    let whitelist = next.whitelist;
+    let status = next.status;
+    
+    // if in wrong state, return
+    if(status[1] !== STATE[2] && status[1] !== STATE[3]) return;
+    if(whitelist.indexOf(card.number) === -1) return;    
+    if(Math.floor(card.number/13)%2 === 0 && status[1] !== STATE[3]) return;
+    if(Math.floor(card.number/13)%2 === 1 && status[1] !== STATE[2]) return;
+    
+    this.showCardOnBoard(next, card);  
+    let jokerwild = this.removeCardFromHand(next, card);
+    
+    // if opponent has the card you use joker replace with, go to STATE[4]
+    next.status[0] = (status[0] === "player1") ? "player2" : "player1";
+    next.status[1] = jokerwild ? STATE[4] : STATE[0];
+    
+    // submit next object to gameCenter
+    this.gameCenter(next);
+  }
+  
+  discardClick(){
+    const step = this.state.step;
+    const history = this.state.history.slice();  
+    let next = JSON.parse(JSON.stringify(history[step]));
+    let whitelist = next.whitelist;
+    let status = next.status;
+  }
+  
+  gameCenter(next){
+    let step = this.state.step;
+    const history = this.state.history.slice();
+    let turn = next.status[0];
+    let state = next.status[1];
+    
+    // check if wild has card can be revealed
+    if(state == STATE[5]){
+      if(next.wild.findIndex((c) => {if(c.status == "hide") return 1; return 0}) == -1){
+        console.log("no hide card in wild");
+        next.status[0] = (turn === "player1") ? "player2" : "player1";
+        next.status[1] = STATE[0];
+      }
+    }
+    
+    // chack if board is avaliable to red joker 
+    if(state == STATE[2]){
+      let a = next.board[1].findIndex((c) => {if(c.status == "trans") return 1; return 0});
+      let b = next.board[3].findIndex((c) => {if(c.status == "trans") return 1; return 0});
+      if(a == -1 && b == -1){
+        console.log("none avaliable for jokerRed");
+        next.status[0] = (turn === "player1") ? "player2" : "player1";
+        next.status[1] = STATE[0];
+      }
+    }
+    
+    // chack if board is avaliable to black joker 
+    if(state == STATE[3]){
+      let a = next.board[0].findIndex((c) => {if(c.status == "trans") return 1; return 0});
+      let b = next.board[2].findIndex((c) => {if(c.status == "trans") return 1; return 0});
+      if(a == -1 && b == -1){
+        console.log("none avaliable for jokerBlack");
+        next.status[0] = (turn === "player1") ? "player2" : "player1";
+        next.status[1] = STATE[0];
+      }
+    }
+    
+    // check before the next player turn
+    if(next.status[1] === STATE[0]){     
+      let wildshow = next.wildshow;
+      let hand = (turn === "player1") ? next.player1 : next.player2;
+      let whitelist = next.whitelist;
+      //check if wildshow has card can be moved to board
+      let i=0; 
+      while(i < wildshow.length){
+        if(whitelist.indexOf(wildshow[i]) > -1){
+          this.showCardOnBoard(next, {number: wildshow[i]});
+          let pos = next.wild.findIndex((c) => {return c.number === wildshow[i]});
+          next.wild[pos].status = "leave"; 
+          wildshow.splice(i, 1);
+          i = 0;
+        }
+        else i++;
+      }  
+      // check if next player hand has card to play
+      let count = whitelist.reduce((acc, num) => {
+        if(hand.findIndex((c) => {return c.number === num}) > -1) return ++acc;
+        return acc;
+      }, 0);
+      if(count === 0) next.status[1] = STATE[1];
+    }
+    
+    // if both player have played all their cards, game end
+    if(next.player1.length == 0 && next.player2.length == 0){
+      let p1 = next.discard1.reduce((acc, card) => acc + card.number%13 + 1, 0);
+      let p2 = next.discard2.reduce((acc, card) => acc + card.number%13 + 1, 0);
+      if(p1 < p2){
+        next.status[0] = "player1";
+        next.status[1] = "player1: " + p1 + ", player2: " + p2 + ", player 1 win !";
+      }
+      else if(p2 < p1){ 
+        next.status[0] = "player2";
+        next.status[1] = "player1: " + p1 + ", player2: " + p2 + ", player 2 win !";
+      }
+      else{
+        next.status[1] = "player1: " + p1 + ", player2: " + p2 + ", draw !";
+      }
+      next.wild.map((c) => {if(c.status =="hide") c.status = "show"; return c;});
+    }
+    
+    // update history stream
+    if(step == history.length-1) history.push(next);
+    else{ 
+      history[step + 1] = next;
+      history.splice(step + 2);
+    }
+    
+    // set state
+    this.setState({history: history, step: ++step});
+  }
+  
+  basicAI(player){
+    const step = this.state.step;
+    const history = this.state.history.slice();
+    const next = history[step];
+    const status = next.status;    
+    const hand = (player === "player1") ? next.player1 : next.player2;
+    const whitelist = next.whitelist;
+    const wild = next.wild;
+    
+    if(status[1] == STATE[0]){ console.log("AI play card");
+       let list = hand.filter((card) => {
+         if(whitelist.indexOf(card.number) > -1) return 1;
+         return 0;
+       }).sort((a, b) => {return 0.5 - Math.random()});
+       let i=0;
+       while(list[i].joker && i<list.length-1) i++;
+       this.handClick(list[i]);
+    }
+    else if(status[1] == STATE[1]){ console.log("AI no card");
+      let list = JSON.parse(JSON.stringify(hand)).sort((a, b) => {return 0.5 - Math.random()});
+      this.handClick(list[0]);
+    }
+    else if(status[1] == STATE[2]){ console.log("AI play jokerRed");
+      let list = whitelist.filter((num) => {
+        if(num < 52 && Math.floor(num/13)%2 == 1) return 1;
+        return 0;
+      }).sort((a, b) => {return 0.5 - Math.random()});                                 
+      let card = this.numToCard(list[0]);
+      this.boardClick(card);
+    }
+    else if(status[1] == STATE[3]){ console.log("AI play jokerBlack");
+      let list = whitelist.filter((num) => {
+        if(num < 52 && Math.floor(num/13)%2 == 0) return 1;
+        return 0;
+      }).sort((a, b) => {return 0.5 - Math.random()});                              
+      let card = this.numToCard(list[0]);
+      this.boardClick(card);
+    }
+    else{ console.log("AI wild click");
+      let list = JSON.parse(JSON.stringify(wild)).filter((card) => {
+        if(card.status == "hide") return 1;
+        else return 0;
+      }).sort((a, b) => {return 0.5 - Math.random()});
+      this.wildClick(list[0]);
+    }
+  }
+  
+  render(){
+    const history = this.state.history.slice();
+    const current = history[this.state.step]; 
+    //console.log(this.state.step);
+    return (
+      <div>
+        <div className="player1">
+          <Player value={current.player1} onClick={(i) => this.handClick(i)}/>
+        </div>
+        <div className="player2">
+          <Player value={current.player2} onClick={(i) => this.handClick(i)}/>
+        </div>
+        <div className="wild">
+          <Player value={current.wild} onClick={(i) => this.wildClick(i)}/>
+        </div>
+        <div className="board">
+          <Board value={current.board} onClick={(i) => this.boardClick(i)}/>
+        </div>
+        <div className="discard1">
+          <Discard value={current.discard1} onClick={(i) => this.discardClick(i)}/>
+        </div>
+        <div className="discard2">
+          <Discard value={current.discard2} onClick={(i) => this.discardClick(i)}/>
+        </div>
+        <div className="menu">
+          <Menu value={current.status} restart={()=>this.restart()} undo={()=>this.undo()} redo={()=>this.redo()}/>
+        </div>  
+      </div>      
+    );
+  }
+  
+  componentDidMount(){
+    const step = this.state.step;
+    const history = this.state.history.slice();
+    const current = history[step];
+    const status = current.status;
+    if(status[0] == "player1") this.basicAI("player1");
+    //if(status[0] == "player2") this.basicAI("player2");
+  }
+  
+  componentDidUpdate(){
+    const step = this.state.step;
+    const history = this.state.history.slice();
+    const current = history[step];
+    const status = current.status;
+    
+    
+    if(status[0] == "player1"){
+      setTimeout(() => this.basicAI("player1"), 1500);
+    }
+    /*
+    if(status[0] == "player2"){
+      setTimeout(() => this.basicAI("player2"), 1500);
+    }*/
+  }
+  
+}
+
+ReactDOM.render(<Game />, document.getElementById('app'));

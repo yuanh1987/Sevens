@@ -1,0 +1,153 @@
+$bg_color: #009933;
+$card_front_bg: #fff2f2;
+$trans_color: #00b33c;
+$card_back: radial-gradient(circle, #ff0000, #660000);
+
+body{
+  background: $bg_color;
+}
+
+.player2{
+  position: absolute;
+  top: 600px;
+}
+.player{
+  margin: 10px;
+}
+.wild{
+  position: absolute;
+  top: 130px;
+  left: 15px;
+  width: 200px;
+}
+.board{
+  position: absolute;
+  top: 138px;
+  left: 210px;
+}
+.boardline{
+  display: inline-block;
+  width: 60px;
+  margin-left: 30px;
+}
+.discard1{
+  position: absolute;
+  top: 138px;
+  left: 610px;
+}
+.discard2{
+  position: absolute;
+  top: 465px;
+  left: 610px;
+}
+.menu{
+  border-radius: 10px;
+  border: 2px solid black;
+  font: 16px "Century Gothic", Futura, sans-serif;
+  font-weight: bold;
+  position: absolute;
+  top: 138px;
+  left: 700px;
+  background-color: #0073e6;
+}
+.menulayout{
+  width: 200px;
+  height: 400px;
+  padding: 20px;
+}
+.menubox{
+  border-radius: 10px;
+  border: 2px solid black;
+  font: 14px "Century Gothic", Futura, sans-serif;
+  font-weight: bold;
+  color: black;
+  height: 120px;
+  margin-bottom: 10px;
+  padding: 10px;
+  background-color: #b3e0ff;
+}
+.menuboxhigh{
+  //border: 5px solid #ff9900;
+  background-color: #ffff66;
+}
+.menubtn{
+  border-radius: 5px;
+  border: 2px solid black;
+  width: 80px;
+  color: #d9d9d9;
+  background: black;
+  display: block;
+  margin: auto;
+  margin-bottom: 10px;
+}
+
+
+.card{
+  display: inline-block;
+  vertical-align: top;
+  border-radius: 5px;
+  border: 1px solid black;
+  font: 16px "Century Gothic", Futura, sans-serif;
+  font-weight: bold;
+  background: $card_front_bg;
+}
+.cardBack{
+  background: $card_back;
+}
+.cardSlot{
+  border: 1px solid black;
+  background: $bg_color;
+  opacity: 0;
+}
+.cardHigh{
+  border: 3px solid #000;
+}
+.cardTrans{
+  color: $trans_color !important;
+  border-style: dotted;
+  border-color: $trans_color;
+  background: $bg_color;
+}
+
+.playerCard{
+  width: 50px;
+  height: 65px;
+}
+.playerCard:hover{
+  width: 55px;
+  height: 70px;
+  font-size: 22px;
+}
+.wildCard{
+  width: 50px;
+  height: 65px;
+}
+.boardCard{
+  width: 50px;
+  height: 30px;
+}
+.discardCard{
+  width: 50px;
+  height: 65px;
+  color: black;
+}
+
+
+.spade{
+    color: black;
+}
+.heart{
+    color: red;
+}
+.diamond{
+    color: red;
+}
+.club{
+    color: black;
+}
+.jokerRed{
+    color: red;
+}
+.jokerBlack{
+    color: black;
+}
