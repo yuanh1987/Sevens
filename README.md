@@ -12,7 +12,7 @@ In order to make it playable for two players (Sevens is originally designed for 
 ## Rules For Special Cases
 Above are the main new rules apply to two-players version Sevens game. There are still have several rules for special cases:
 1. If you have the card that your opponent play joker as, you should discard it (not fold it) and draw a new card from WILD.
-2. If the card you reveal from WILD already existed on board, reveal another card from WILD.
+2. If the card you reveal from WILD already existed on board (because of jokers), reveal another card from WILD.
 
 ## Demo
 https://youtu.be/hC0FG8tmRZ8
