@@ -14,4 +14,5 @@ Above are the main new rules apply to two-players version Sevens game. There are
 
 
 ## Demo
+https://youtu.be/hC0FG8tmRZ8
 <img src="demo/1.JPG" width=550 height=400/>
